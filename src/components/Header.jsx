@@ -199,47 +199,24 @@ const Header = ({ user: userProp }) => {
             About
           </Link>
           
-          <div className="relative">
-            <button
-              onClick={() => setShowShopsDropdown(!showShopsDropdown)}
-              className="w-full text-left py-2 text-gray-700 hover:text-primary transition flex items-center justify-between"
-            >
-              <span>Shops</span>
-              <svg
-                className={`w-4 h-4 transition-transform ${showShopsDropdown ? 'rotate-180' : ''}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-            
-            {showShopsDropdown && (
-              <div className="pl-4 mt-2 space-y-2">
-                <Link
-                  to="/equipment-shop"
-                  onClick={() => {
-                    setShowShopsDropdown(false);
-                    setMobileMenuOpen(false);
-                  }}
-                  className="block py-2 text-gray-600 hover:text-primary transition"
-                >
-                  Equipment Shop
-                </Link>
-                <Link
-                  to="/restaurant"
-                  onClick={() => {
-                    setShowShopsDropdown(false);
-                    setMobileMenuOpen(false);
-                  }}
-                  className="block py-2 text-gray-600 hover:text-primary transition"
-                >
-                  Restaurant
-                </Link>
-              </div>
-            )}
-          </div>
+          <Link
+            to="/equipment-shop"
+            onClick={() => setMobileMenuOpen(false)}
+            className={`block py-2 text-gray-700 hover:text-primary transition ${
+              isActive('/equipment-shop') ? 'border-l-4 border-primary pl-3 text-primary' : 'pl-0'
+            }`}
+          >
+            Equipment Shop
+          </Link>
+          <Link
+            to="/restaurant"
+            onClick={() => setMobileMenuOpen(false)}
+            className={`block py-2 text-gray-700 hover:text-primary transition ${
+              isActive('/restaurant') ? 'border-l-4 border-primary pl-3 text-primary' : 'pl-0'
+            }`}
+          >
+            Restaurant
+          </Link>
 
           <Link
             to="/contact"

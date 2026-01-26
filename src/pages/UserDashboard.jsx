@@ -345,8 +345,7 @@ const UserDashboard = () => {
   };
 
   const getCourtNumber = (booking) => {
-    // If complex has multiple courts, you could store court number in booking
-    // For now, we'll use a simple approach based on complex ID
+  
     if (booking.complexId) {
       const courtNum = (parseInt(booking.complexId.slice(-1)) || 1) % 5 + 1;
       return `Court ${courtNum}`;
@@ -354,7 +353,6 @@ const UserDashboard = () => {
     return 'Court 1';
   };
 
-  // Get number of guests (default to 1 if not specified)
   const getGuests = (booking) => {
     return booking.guests || 1;
   };
@@ -365,7 +363,7 @@ const UserDashboard = () => {
       
       <div className="flex-1 container mx-auto px-3 sm:px-4 py-4 sm:py-6 md:py-8">
         <div className="max-w-7xl mx-auto">
-          {/* Top Navigation Tabs */}
+          
           <div className="bg-white rounded-lg shadow-sm p-1.5 sm:p-2 mb-4 sm:mb-6 flex flex-wrap gap-1.5 sm:gap-2">
             <button
               onClick={() => setActiveTab('dashboard')}

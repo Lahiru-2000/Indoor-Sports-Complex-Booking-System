@@ -43,26 +43,6 @@ const HomePage = ({ user }) => {
         setCoaches(coachesData);
       } catch (error) {
         console.error('Error fetching data:', error);
-        setComplexes([
-          {
-            id: '1',
-            name: 'Elite Sports Complex',
-            image: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800',
-            features: ['Football Stadium', 'Cricket Stadium', 'Swimming Pool', 'Sports Item Shop', 'Restaurant & Refreshments']
-          },
-          {
-            id: '2',
-            name: 'Prime Athletic Arena',
-            image: 'https://images.unsplash.com/photo-1575361204480-aadea25e6e68?w=800',
-            features: ['International Standard Stadiums', 'Certified Coaches', 'Swimming Pool', 'Energy & Nutrition Store', 'Family-Friendly Restaurant']
-          },
-          {
-            id: '3',
-            name: 'Unity Sports Hub',
-            image: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=800',
-            features: ['Multi-Sport Facilities', 'Personal & Team Coaching', 'Swimming Pool', 'Sports Accessories Store', 'Healthy Food Corner']
-          }
-        ]);
       }
     };
 

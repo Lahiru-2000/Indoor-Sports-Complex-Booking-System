@@ -5,7 +5,7 @@ import { useAuth } from '../hooks/useAuth';
 import AdminNavbar from '../components/AdminNavbar';
 import AdminSidebar from '../components/AdminSidebar';
 import { Navigate } from 'react-router-dom';
-import { HiPencil, HiTrash, HiCheckCircle, HiXCircle, HiShieldCheck, HiClipboard, HiClock, HiCheck, HiX, HiTrendingUp, HiShoppingBag, HiFolder, HiEmojiHappy, HiUserCircle, HiUsers, HiOfficeBuilding, HiEye } from 'react-icons/hi';
+import { HiPencil, HiTrash, HiCheckCircle, HiXCircle, HiClipboard, HiClock, HiCheck, HiX, HiTrendingUp, HiShoppingBag, HiFolder, HiEmojiHappy, HiUserCircle, HiUsers, HiOfficeBuilding, HiEye } from 'react-icons/hi';
 import Swal from 'sweetalert2';
 
 const AdminDashboard = () => {
@@ -519,25 +519,6 @@ const AdminDashboard = () => {
     }
   };
 
-  const updateUserRole = async (userId, newRole) => {
-    const result = await Swal.fire({
-      title: 'Change User Role',
-      text: `Change role for this user to "${newRole}"?`,
-      icon: 'question',
-      showCancelButton: true,
-      confirmButtonColor: '#10b981',
-      cancelButtonColor: '#ef4444',
-      confirmButtonText: 'Yes, change it!',
-      cancelButtonText: 'Cancel'
-    });
-    if (!result.isConfirmed) return;
-    try {
-      await updateDoc(doc(db, 'users', userId), { role: newRole });
-      fetchData();
-    } catch (error) {
-      console.error('Error updating user role:', error);
-    }
-  };
 
   const handleDeleteUser = async (userId) => {
     const result = await Swal.fire({
@@ -1977,15 +1958,6 @@ const AdminDashboard = () => {
                                         >
                                           <HiEye className="w-5 h-5" />
                                   </button>
-                                        {u.role !== 'admin' ? (
-                                          <button onClick={() => updateUserRole(u.id, 'admin')} className="text-purple-600 hover:text-purple-900" title="Make Admin">
-                                            <HiShieldCheck className="w-5 h-5" />
-                                  </button>
-                                        ) : (
-                                          <button onClick={() => updateUserRole(u.id, 'user')} className="text-gray-600 hover:text-gray-900" title="Set User">
-                                            <HiUserCircle className="w-5 h-5" />
-                                          </button>
-                                        )}
                                         <button onClick={() => handleDeleteUser(u.id)} className="text-red-600 hover:text-red-900" title="Delete">
                                           <HiTrash className="w-5 h-5" />
                                   </button>
