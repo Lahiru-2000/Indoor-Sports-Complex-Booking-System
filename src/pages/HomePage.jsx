@@ -43,6 +43,26 @@ const HomePage = ({ user }) => {
         setCoaches(coachesData);
       } catch (error) {
         console.error('Error fetching data:', error);
+        setComplexes([
+          {
+            id: '1',
+            name: 'Elite Sports Complex',
+            image: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800',
+            features: ['Football Stadium', 'Cricket Stadium', 'Swimming Pool', 'Sports Item Shop', 'Restaurant & Refreshments']
+          },
+          {
+            id: '2',
+            name: 'Prime Athletic Arena',
+            image: 'https://images.unsplash.com/photo-1575361204480-aadea25e6e68?w=800',
+            features: ['International Standard Stadiums', 'Certified Coaches', 'Swimming Pool', 'Energy & Nutrition Store', 'Family-Friendly Restaurant']
+          },
+          {
+            id: '3',
+            name: 'Unity Sports Hub',
+            image: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=800',
+            features: ['Multi-Sport Facilities', 'Personal & Team Coaching', 'Swimming Pool', 'Sports Accessories Store', 'Healthy Food Corner']
+          }
+        ]);
       }
     };
 
@@ -53,49 +73,54 @@ const HomePage = ({ user }) => {
     <div className="min-h-screen flex flex-col">
       <Header user={user} />
       
-      <section className="py-12 sm:py-16 md:py-20 px-4 sm:px-6 bg-white">
-        <div className="container mx-auto text-center">
-          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-800 mb-4 sm:mb-6 px-2">
-            Your Ultimate Sports Experience{' '}
-            <span className="text-primary">All in One Arena</span>
-          </h1>
-          <p className="text-base sm:text-lg md:text-xl text-gray-600 mb-6 sm:mb-8 max-w-3xl mx-auto px-2">
-            Book stadiums, hire professional coaches, purchase sports gear, and enjoy refreshments, all from a single platform.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center mb-8 sm:mb-12 px-2">
-            <Link
-              to={user ? "/browse-complexes" : "/login"}
-              className="px-6 sm:px-8 py-2.5 sm:py-3 bg-primary text-white rounded-lg hover:bg-primary-dark transition text-base sm:text-lg font-semibold"
-            >
-              Book Now
-            </Link>
-            <a
-              href="#complexes"
-              className="px-6 sm:px-8 py-2.5 sm:py-3 border-2 border-primary text-primary bg-white rounded-lg hover:bg-primary hover:text-white transition text-base sm:text-lg font-semibold inline-block text-center"
-              onClick={(e) => {
-                e.preventDefault();
-                const element = document.getElementById('complexes');
-                if (element) {
-                  element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
-              }}
-            >
-              Explore Complexes
-            </a>
-          </div>
-          <div className="mt-8 sm:mt-12 md:mt-16">
-            <div className="relative w-full max-w-6xl mx-auto rounded-lg shadow-xl overflow-hidden bg-gray-100">
-              <div className="aspect-video w-full">
-                <img
-                  src="/images/Rectangle 39899 (2).png"
-                  alt="Prime Play Stadium"
-                  className="w-full h-full object-cover object-center"
-                  loading="eager"
-                  onError={(e) => {
-                    e.target.src = 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=1200';
-                  }}
-                />
-              </div>
+      {/* Hero Section with Image Background */}
+      <section className="relative min-h-[70vh] sm:min-h-[80vh] md:min-h-[90vh] flex items-center justify-center overflow-hidden">
+        {/* Background Image with Overlay */}
+        <div className="absolute inset-0 z-0">
+          <img
+            src="/images/home image.jpg"
+            alt="Prime Play Stadium"
+            className="w-full h-full object-cover object-center"
+            loading="eager"
+            onError={(e) => {
+              e.target.src = 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=1200';
+            }}
+          />
+          {/* Gradient Overlay for better text readability */}
+          <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/60"></div>
+          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"></div>
+        </div>
+
+        {/* Content */}
+        <div className="relative z-10 container mx-auto px-4 sm:px-6 py-12 sm:py-16 md:py-20 text-center">
+          <div className="max-w-4xl mx-auto">
+            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-4 sm:mb-6 leading-tight drop-shadow-2xl">
+              Your Ultimate Sports Experience{' '}
+              <span className="text-primary">All in One Arena</span>
+            </h1>
+            <p className="text-lg sm:text-xl md:text-2xl text-gray-100 mb-8 sm:mb-10 max-w-3xl mx-auto leading-relaxed drop-shadow-lg">
+              Book stadiums, hire professional coaches, purchase sports gear, and enjoy refreshments, all from a single platform.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center items-center">
+              <Link
+                to={user ? "/browse-complexes" : "/login"}
+                className="px-8 sm:px-10 py-3.5 sm:py-4 bg-primary text-white rounded-lg hover:bg-primary-dark transition-all transform hover:scale-105 shadow-xl hover:shadow-2xl text-lg sm:text-xl font-semibold min-w-[200px]"
+              >
+                Book Now
+              </Link>
+              <a
+                href="#complexes"
+                className="px-8 sm:px-10 py-3.5 sm:py-4 border-2 border-white text-white bg-white/10 backdrop-blur-sm rounded-lg hover:bg-white hover:text-primary transition-all transform hover:scale-105 shadow-xl hover:shadow-2xl text-lg sm:text-xl font-semibold min-w-[200px]"
+                onClick={(e) => {
+                  e.preventDefault();
+                  const element = document.getElementById('complexes');
+                  if (element) {
+                    element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }
+                }}
+              >
+                Explore Complexes
+              </a>
             </div>
           </div>
         </div>

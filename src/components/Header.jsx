@@ -47,7 +47,7 @@ const Header = ({ user: userProp }) => {
   };
 
   return (
-    <header className="bg-white shadow-md relative">
+    <header className="bg-white shadow-md sticky top-0 z-50">
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
           <Link to="/" className="flex items-center space-x-2 sm:space-x-3" onClick={() => setMobileMenuOpen(false)}>
@@ -117,7 +117,7 @@ const Header = ({ user: userProp }) => {
           </nav>
 
           <div className="hidden md:flex items-center space-x-4">
-            {user ? (
+            {user && location.pathname !== '/register' ? (
               <>
                 {user.role === 'admin' ? (
                   <Link
@@ -175,7 +175,7 @@ const Header = ({ user: userProp }) => {
 
       <div
         ref={mobileMenuRef}
-        className={`md:hidden absolute top-full left-0 right-0 bg-white shadow-lg border-t border-gray-200 transition-all duration-300 ease-in-out ${
+        className={`md:hidden absolute top-full left-0 right-0 bg-white shadow-lg border-t border-gray-200 z-50 transition-all duration-300 ease-in-out ${
           mobileMenuOpen ? 'max-h-screen opacity-100' : 'max-h-0 opacity-0 overflow-hidden'
         }`}
       >
@@ -199,24 +199,24 @@ const Header = ({ user: userProp }) => {
             About
           </Link>
           
-          <Link
-            to="/equipment-shop"
+                <Link
+                  to="/equipment-shop"
             onClick={() => setMobileMenuOpen(false)}
             className={`block py-2 text-gray-700 hover:text-primary transition ${
               isActive('/equipment-shop') ? 'border-l-4 border-primary pl-3 text-primary' : 'pl-0'
             }`}
-          >
-            Equipment Shop
-          </Link>
-          <Link
-            to="/restaurant"
+                >
+                  Equipment Shop
+                </Link>
+                <Link
+                  to="/restaurant"
             onClick={() => setMobileMenuOpen(false)}
             className={`block py-2 text-gray-700 hover:text-primary transition ${
               isActive('/restaurant') ? 'border-l-4 border-primary pl-3 text-primary' : 'pl-0'
             }`}
-          >
-            Restaurant
-          </Link>
+                >
+                  Restaurant
+                </Link>
 
           <Link
             to="/contact"
@@ -229,7 +229,7 @@ const Header = ({ user: userProp }) => {
           </Link>
 
           <div className="pt-4 border-t border-gray-200 space-y-3">
-            {user ? (
+            {user && location.pathname !== '/register' ? (
               <>
                 {user.role === 'admin' ? (
                   <Link

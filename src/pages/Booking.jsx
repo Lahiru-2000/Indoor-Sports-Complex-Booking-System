@@ -14,7 +14,7 @@ const Booking = () => {
   const location = useLocation();
   const { user } = useAuth();
   const [complex, setComplex] = useState(null);
-  const [userPackage, setUserPackage] = useState('normal');
+  const [userPackage, setUserPackage] = useState('basic');
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingBookingId, setEditingBookingId] = useState(null);
   const [originalHours, setOriginalHours] = useState(0);
@@ -29,6 +29,7 @@ const Booking = () => {
     items: []
   });
   const [coaches, setCoaches] = useState([]);
+  const [allCoaches, setAllCoaches] = useState([]);
   const [sportsItems, setSportsItems] = useState([]);
   const [drinks, setDrinks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -77,19 +78,19 @@ const Booking = () => {
             const userDoc = await getDoc(doc(db, 'users', user.uid));
             if (userDoc.exists()) {
               const userData = userDoc.data();
-              const packageValue = userData.package || 'normal';
+              const packageValue = userData.package || 'basic';
               setUserPackage(packageValue);
               console.log('User package fetched:', packageValue);
             } else {
               console.warn('User document not found');
-              setUserPackage('normal');
+              setUserPackage('basic');
             }
           } catch (err) {
             console.error('Error fetching user package:', err);
-            setUserPackage('normal');
+            setUserPackage('basic');
           }
         } else {
-          setUserPackage('normal');
+          setUserPackage('basic');
         }
 
         if (editBookingId && user) {
@@ -157,9 +158,12 @@ const Booking = () => {
 
         const coachesQuery = query(collection(db, 'coaches'), where('complexId', '==', complexId));
         const coachesSnapshot = await getDocs(coachesQuery);
-        setCoaches(coachesSnapshot.docs
+        const fetchedCoaches = coachesSnapshot.docs
           .map(doc => ({ id: doc.id, ...doc.data() }))
-          .filter(coach => coach.status !== 'deleted'));
+          .filter(coach => coach.status !== 'deleted');
+        
+        // Store all coaches for this complex
+        setAllCoaches(fetchedCoaches);
 
         const itemsSnapshot = await getDocs(collection(db, 'sportsItems'));
         setSportsItems(itemsSnapshot.docs
@@ -360,6 +364,40 @@ const Booking = () => {
     fetchBookedSlots();
   }, [formData.date, formData.sport, complexId]);
 
+  // Filter coaches based on selected sport
+  useEffect(() => {
+    if (!formData.sport || allCoaches.length === 0) {
+      // If no sport selected, show all coaches for the complex
+      setCoaches(allCoaches);
+      return;
+    }
+
+    const selectedSport = formData.sport.toLowerCase().trim();
+    const complexSports = complex?.sports || [];
+    const complexHasSport = complexSports.some(s => s.toLowerCase() === selectedSport);
+    
+    if (complexHasSport) {
+      // Filter coaches that have the selected sport in their sports array
+      const filteredCoaches = allCoaches.filter(coach => {
+        const coachSports = coach.sports || [];
+        return coachSports.some(s => s.toLowerCase() === selectedSport);
+      });
+      setCoaches(filteredCoaches);
+      
+      // Clear selected coach if it's not available for the new sport
+      if (formData.coachId && !filteredCoaches.some(c => c.id === formData.coachId)) {
+        setFormData(prev => ({ ...prev, coachId: '' }));
+      }
+    } else {
+      // If complex doesn't have the sport, no coaches available
+      setCoaches([]);
+      // Clear selected coach
+      if (formData.coachId) {
+        setFormData(prev => ({ ...prev, coachId: '' }));
+      }
+    }
+  }, [formData.sport, allCoaches, complex, formData.coachId]);
+
   // Periodically check and remove past slots if booking for today
   useEffect(() => {
     if (!formData.date || !isToday(formData.date)) return;
@@ -459,8 +497,10 @@ const Booking = () => {
     
     // Apply package discount for all complex bookings (pitch/court bookings)
     // Discount applies to the court/pitch price, not coach or equipment
-    if (userPackage && userPackage !== 'normal') {
-      const discountPercent = userPackage === 'package2' ? 2 : userPackage === 'package3' ? 5 : 0;
+    // Support both old and new package names for backward compatibility
+    const isPaidPackage = userPackage && userPackage !== 'normal' && userPackage !== 'basic';
+    if (isPaidPackage) {
+      const discountPercent = (userPackage === 'silver' || userPackage === 'package2') ? 2 : (userPackage === 'gold' || userPackage === 'package3') ? 5 : 0;
       if (discountPercent > 0) {
         const discount = (courtTotal * discountPercent) / 100;
         courtTotal = courtTotal - discount;
@@ -488,19 +528,21 @@ const Booking = () => {
 
   // Calculate discount amount for display
   const getDiscountAmount = () => {
-    if (!userPackage || userPackage === 'normal') return 0;
+    // Support both old and new package names for backward compatibility
+    if (!userPackage || userPackage === 'normal' || userPackage === 'basic') return 0;
     
     const pricePerHour = complex?.pricePerHour || 50;
     const hours = formData.selectedTimeSlots?.length || 0;
     const courtTotal = pricePerHour * hours;
-    const discountPercent = userPackage === 'package2' ? 2 : userPackage === 'package3' ? 5 : 0;
+    const discountPercent = (userPackage === 'silver' || userPackage === 'package2') ? 2 : (userPackage === 'gold' || userPackage === 'package3') ? 5 : 0;
     return discountPercent > 0 ? (courtTotal * discountPercent) / 100 : 0;
   };
 
   // Get discount percentage for display
   const getDiscountPercent = () => {
-    if (!userPackage || userPackage === 'normal') return 0;
-    return userPackage === 'package2' ? 2 : userPackage === 'package3' ? 5 : 0;
+    // Support both old and new package names for backward compatibility
+    if (!userPackage || userPackage === 'normal' || userPackage === 'basic') return 0;
+    return (userPackage === 'silver' || userPackage === 'package2') ? 2 : (userPackage === 'gold' || userPackage === 'package3') ? 5 : 0;
   };
 
   // Get start and end time from selected slots
@@ -587,8 +629,10 @@ const Booking = () => {
           additionalCost = pricePerHour * additionalHours;
           
           // Apply package discount to additional hours
-          if (userPackage && userPackage !== 'normal') {
-            const discountPercent = userPackage === 'package2' ? 2 : userPackage === 'package3' ? 5 : 0;
+          // Support both old and new package names for backward compatibility
+          const isPaidPackage = userPackage && userPackage !== 'normal' && userPackage !== 'basic';
+          if (isPaidPackage) {
+            const discountPercent = (userPackage === 'silver' || userPackage === 'package2') ? 2 : (userPackage === 'gold' || userPackage === 'package3') ? 5 : 0;
             if (discountPercent > 0) {
               const discount = (additionalCost * discountPercent) / 100;
               additionalCost = additionalCost - discount;
@@ -670,19 +714,26 @@ const Booking = () => {
         
         if (userEmail) {
           const complexDoc = await getDoc(doc(db, 'complexes', complexId));
-          const complexName = complexDoc.data()?.name || 'Sports Complex';
+          const complexData = complexDoc.data();
+          const complexName = complexData?.name || 'Sports Complex';
+          const complexLocation = complexData?.location || '';
           
-          await sendBookingEmail({
+          // Include equipment items in booking email if they're part of this booking
+          const bookingEmailData = {
             bookingId: bookingRef.id,
             complexName,
+            complexLocation,
             sport: bookingData.sport,
             date: bookingData.date,
             timeSlot: bookingData.timeSlot,
             hours: bookingData.hours,
             coachRequired: bookingData.coachRequired,
             total: bookingData.total,
-            status: bookingData.status
-          }, userEmail);
+            status: bookingData.status,
+            items: includeItems && formData.items && formData.items.length > 0 ? formData.items : []
+          };
+          
+          await sendBookingEmail(bookingEmailData, userEmail);
         }
       } catch (emailError) {
         console.error('Error sending booking email:', emailError);
@@ -702,23 +753,8 @@ const Booking = () => {
         };
         const equipmentPurchaseRef = await addDoc(collection(db, 'equipmentPurchases'), equipmentPurchaseData);
         
-        // Send equipment purchase confirmation email
-        try {
-          const userDoc = await getDoc(doc(db, 'users', user.uid));
-          const userEmail = userDoc.data()?.email || user.email;
-          
-          if (userEmail) {
-            await sendEquipmentEmail({
-              orderId: equipmentPurchaseRef.id,
-              items: formData.items,
-              total: equipmentTotal,
-              status: 'pending'
-            }, userEmail);
-          }
-        } catch (emailError) {
-          console.error('Error sending equipment email:', emailError);
-          // Don't fail the purchase if email fails
-        }
+        // Don't send separate equipment email when it's part of a booking
+        // Equipment details are already included in the booking confirmation email above
       }
 
       if (!skipNavigation) {
@@ -1611,9 +1647,9 @@ const Booking = () => {
                             <span className="text-gray-600">Additional Hours ({pendingBookingUpdate.additionalHours} {pendingBookingUpdate.additionalHours === 1 ? 'hour' : 'hours'})</span>
                             <span className="font-semibold">£{((complex?.pricePerHour || 50) * pendingBookingUpdate.additionalHours).toFixed(2)}</span>
                           </div>
-                          {userPackage && userPackage !== 'normal' && (
+                          {(userPackage && userPackage !== 'normal' && userPackage !== 'basic') && (
                             <div className="flex justify-between text-green-600">
-                              <span className="text-gray-600">Package Discount ({userPackage === 'package2' ? 2 : userPackage === 'package3' ? 5 : 0}%)</span>
+                              <span className="text-gray-600">Package Discount ({(userPackage === 'silver' || userPackage === 'package2') ? 2 : (userPackage === 'gold' || userPackage === 'package3') ? 5 : 0}%)</span>
                               <span className="font-semibold">-£{(((complex?.pricePerHour || 50) * pendingBookingUpdate.additionalHours) - pendingBookingUpdate.additionalCost).toFixed(2)}</span>
                             </div>
                           )}

@@ -15,6 +15,36 @@ export const sendBookingEmail = async (bookingData, userEmail) => {
       formattedDate = dateObj.toLocaleDateString('en-GB');
     }
 
+    // Get location from booking data (fetched from complex document in admin dashboard)
+    const complexLocation = (bookingData.complexLocation && bookingData.complexLocation.trim()) || '';
+
+    // Format equipment items if included in booking
+    let itemsList = '';
+    let itemsCount = 0;
+    if (bookingData.items && bookingData.items.length > 0) {
+      itemsList = bookingData.items
+        .map(item => 
+          `${item.name || item.itemName} x${item.quantity || 1} - £${((item.price || 0) * (item.quantity || 1)).toFixed(2)}`
+        )
+        .join('\n');
+      itemsCount = bookingData.items.reduce((sum, item) => sum + (item.quantity || 1), 0);
+    }
+
+    // Build message with all booking details
+    let message = `Your booking for ${bookingData.complexName || 'Sports Complex'} on ${formattedDate || 'N/A'} at ${bookingData.timeSlot || 'N/A'} has been confirmed.`;
+    
+    if (bookingData.coachRequired) {
+      message += '\nCoach: Included';
+    }
+    
+    if (itemsList) {
+      message += `\n\nEquipment Items:\n${itemsList}`;
+    }
+    
+    if (complexLocation) {
+      message += `\n\nLocation: ${complexLocation}`;
+    }
+
     const templateParams = {
       to_email: userEmail,
       type: 'Booking Confirmation',
@@ -27,11 +57,13 @@ export const sendBookingEmail = async (bookingData, userEmail) => {
       coach: bookingData.coachRequired ? 'Included' : 'Not Included',
       total: `£${(bookingData.total || 0).toFixed(2)}`,
       status: bookingData.status || 'pending',
-      message: `Your booking for ${bookingData.complexName || 'Sports Complex'} on ${formattedDate || 'N/A'} at ${bookingData.timeSlot || 'N/A'} has been confirmed.`,
+      message: message,
       booking_id: bookingData.bookingId || 'N/A',
-      items: '',
-      items_count: '',
-      order_id: ''
+      items: itemsList || '',
+      items_count: itemsCount || 0,
+      order_id: '',
+      complex_location: complexLocation || 'N/A',
+      location_url: ''
     };
 
     if (SERVICE_ID === 'your_service_id' || TEMPLATE_ID === 'your_template_id' || PUBLIC_KEY === 'your_public_key') {
@@ -68,8 +100,15 @@ export const sendRestaurantEmail = async (purchaseData, userEmail) => {
     const itemsCount = purchaseData.items.reduce((sum, item) => sum + (item.quantity || 1), 0);
 
     const complexName = purchaseData.complex?.name || 'N/A';
-    const complexLocation = purchaseData.complex?.location || 'N/A';
-    const complexInfo = complexName !== 'N/A' ? `${complexName}${complexLocation !== 'N/A' ? ` - ${complexLocation}` : ''}` : 'N/A';
+    // Get location from complex data (from admin dashboard)
+    const complexLocation = (purchaseData.complex?.location && purchaseData.complex.location.trim()) || '';
+    const complexInfo = complexName !== 'N/A' ? `${complexName}${complexLocation ? ` - ${complexLocation}` : ''}` : 'N/A';
+
+    // Build message with location (no map link)
+    let message = `Your restaurant order has been placed successfully at ${complexInfo}. You ordered ${itemsCount} item(s) for a total of £${(purchaseData.total || 0).toFixed(2)}.`;
+    if (complexLocation) {
+      message += `\n\nLocation: ${complexLocation}`;
+    }
 
     const templateParams = {
       to_email: userEmail,
@@ -79,15 +118,17 @@ export const sendRestaurantEmail = async (purchaseData, userEmail) => {
       items_count: itemsCount || 0,
       total: `£${(purchaseData.total || 0).toFixed(2)}`,
       status: purchaseData.status || 'pending',
-      message: `Your restaurant order has been placed successfully at ${complexInfo}. You ordered ${itemsCount} item(s) for a total of £${(purchaseData.total || 0).toFixed(2)}.`,
+      message: message,
       order_id: purchaseData.orderId || 'N/A',
       complex_name: complexInfo,
-      sport: complexLocation !== 'N/A' ? `Location: ${complexLocation}` : '',
+      sport: complexLocation ? `Location: ${complexLocation}` : '',
       date: '',
       time_slot: '',
       hours: '',
       coach: '',
-      booking_id: ''
+      booking_id: '',
+      complex_location: complexLocation || 'N/A',
+      location_url: ''
     };
 
     if (SERVICE_ID === 'your_service_id' || TEMPLATE_ID === 'your_template_id' || PUBLIC_KEY === 'your_public_key') {
@@ -123,8 +164,15 @@ export const sendEquipmentEmail = async (purchaseData, userEmail) => {
     const itemsCount = purchaseData.items.reduce((sum, item) => sum + (item.quantity || 1), 0);
 
     const complexName = purchaseData.complex?.name || 'N/A';
-    const complexLocation = purchaseData.complex?.location || 'N/A';
-    const complexInfo = complexName !== 'N/A' ? `${complexName}${complexLocation !== 'N/A' ? ` - ${complexLocation}` : ''}` : 'N/A';
+    // Get location from complex data (from admin dashboard)
+    const complexLocation = (purchaseData.complex?.location && purchaseData.complex.location.trim()) || '';
+    const complexInfo = complexName !== 'N/A' ? `${complexName}${complexLocation ? ` - ${complexLocation}` : ''}` : 'N/A';
+
+    // Build message with location (no map link)
+    let message = `Your equipment order has been placed successfully at ${complexInfo}. You ordered ${itemsCount} item(s) for a total of £${(purchaseData.total || 0).toFixed(2)}.`;
+    if (complexLocation) {
+      message += `\n\nLocation: ${complexLocation}`;
+    }
 
     const templateParams = {
       to_email: userEmail,
@@ -134,15 +182,17 @@ export const sendEquipmentEmail = async (purchaseData, userEmail) => {
       items_count: itemsCount || 0,
       total: `£${(purchaseData.total || 0).toFixed(2)}`,
       status: purchaseData.status || 'pending',
-      message: `Your equipment order has been placed successfully at ${complexInfo}. You ordered ${itemsCount} item(s) for a total of £${(purchaseData.total || 0).toFixed(2)}.`,
+      message: message,
       order_id: purchaseData.orderId || 'N/A',
       complex_name: complexInfo,
-      sport: complexLocation !== 'N/A' ? `Location: ${complexLocation}` : '',
+      sport: complexLocation ? `Location: ${complexLocation}` : '',
       date: '',
       time_slot: '',
       hours: '',
       coach: '',
-      booking_id: ''
+      booking_id: '',
+      complex_location: complexLocation || 'N/A',
+      location_url: ''
     };
 
     if (SERVICE_ID === 'your_service_id' || TEMPLATE_ID === 'your_template_id' || PUBLIC_KEY === 'your_public_key') {
