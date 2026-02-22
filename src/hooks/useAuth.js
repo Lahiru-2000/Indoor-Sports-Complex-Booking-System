@@ -4,7 +4,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
 
 // Session timeout in milliseconds (24 hours = 24 * 60 * 60 * 1000)
-const SESSION_TIMEOUT = 1 * 60 * 60 * 1000;
+const SESSION_TIMEOUT = 1 * 2 * 60 * 1000;
 
 // Check if session has expired
 const isSessionExpired = () => {
