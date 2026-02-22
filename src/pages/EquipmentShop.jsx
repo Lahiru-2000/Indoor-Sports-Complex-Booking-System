@@ -44,7 +44,7 @@ const EquipmentShop = () => {
             id: doc.id,
             ...doc.data()
           }))
-          .filter(item => item.status !== 'deleted');
+          .filter(item => item.status !== 'deleted' && item.enabled !== false);
         setSportsItems(itemsData);
       } catch (error) {
         console.error('Error fetching sports items:', error);

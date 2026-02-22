@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { HiEye, HiCheckCircle, HiXCircle } from 'react-icons/hi';
@@ -5,6 +6,7 @@ import Swal from 'sweetalert2';
 
 const AdminEquipmentPurchases = ({
   equipmentPurchases,
+  complexes,
   onRefresh,
   setViewingRecord,
   setViewModalType,
@@ -12,15 +14,46 @@ const AdminEquipmentPurchases = ({
   setCurrentPage,
   recordsPerPage
 }) => {
+  const [complexFilter, setComplexFilter] = useState('all');
+  const [itemFilter, setItemFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [dateFilter, setDateFilter] = useState('');
   const handlePageChange = (tab, page) => {
     setCurrentPage(prev => ({ ...prev, [tab]: page }));
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const updateEquipmentPurchaseStatus = async (purchaseId, status) => {
+    const statusText = status === 'confirmed' ? 'confirm' : 'cancel';
+    const statusTitle = status === 'confirmed' ? 'Confirm Purchase' : 'Cancel Purchase';
+    const statusMessage = status === 'confirmed' 
+      ? 'Are you sure you want to confirm this equipment purchase?'
+      : 'Are you sure you want to cancel this equipment purchase?';
+    const confirmButtonText = status === 'confirmed' ? 'Yes, confirm it!' : 'Yes, cancel it!';
+    const confirmButtonColor = status === 'confirmed' ? '#10b981' : '#ef4444';
+
+    const result = await Swal.fire({
+      title: statusTitle,
+      text: statusMessage,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: confirmButtonColor,
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: confirmButtonText,
+      cancelButtonText: 'Cancel'
+    });
+
+    if (!result.isConfirmed) return;
+
     try {
       await updateDoc(doc(db, 'equipmentPurchases', purchaseId), { status });
       onRefresh();
+      Swal.fire({
+        icon: 'success',
+        title: status === 'confirmed' ? 'Purchase Confirmed!' : 'Purchase Cancelled!',
+        text: `The equipment purchase has been ${statusText}ed successfully.`,
+        confirmButtonColor: '#10b981'
+      });
     } catch (error) {
       console.error('Error updating equipment purchase:', error);
       Swal.fire({
@@ -32,16 +65,153 @@ const AdminEquipmentPurchases = ({
     }
   };
 
+  // Get unique item names from all purchases
+  const getUniqueItemNames = () => {
+    const itemNamesSet = new Set();
+    equipmentPurchases.forEach(purchase => {
+      if (purchase.items && Array.isArray(purchase.items)) {
+        purchase.items.forEach(item => {
+          const itemName = item.name || item.itemName;
+          if (itemName) {
+            itemNamesSet.add(itemName);
+          }
+        });
+      }
+    });
+    return Array.from(itemNamesSet).sort();
+  };
+
+  const getFilteredPurchases = () => {
+    let filtered = equipmentPurchases;
+
+    // Filter by complex
+    if (complexFilter !== 'all') {
+      filtered = filtered.filter(purchase => purchase.complexId === complexFilter);
+    }
+
+    // Filter by item
+    if (itemFilter !== 'all') {
+      filtered = filtered.filter(purchase => {
+        if (!purchase.items || !Array.isArray(purchase.items)) return false;
+        return purchase.items.some(item => {
+          const itemName = item.name || item.itemName;
+          return itemName === itemFilter;
+        });
+      });
+    }
+
+    // Filter by status
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(purchase => purchase.status === statusFilter);
+    }
+
+    // Filter by date
+    if (dateFilter !== '') {
+      filtered = filtered.filter(purchase => {
+        if (!purchase.createdAt) return false;
+        const purchaseDate = purchase.createdAt?.toDate ? purchase.createdAt.toDate() : new Date(purchase.createdAt);
+        const filterDate = new Date(dateFilter);
+        const purchaseDateStr = purchaseDate.toISOString().split('T')[0];
+        const filterDateStr = filterDate.toISOString().split('T')[0];
+        return purchaseDateStr === filterDateStr;
+      });
+    }
+
+    return filtered;
+  };
+
+  const filteredPurchases = getFilteredPurchases();
   const purchasePage = currentPage['equipmentPurchases'] || 1;
   const startIndex = (purchasePage - 1) * recordsPerPage;
   const endIndex = startIndex + recordsPerPage;
-  const paginatedPurchases = equipmentPurchases.slice(startIndex, endIndex);
-  const totalPurchasePages = Math.ceil(equipmentPurchases.length / recordsPerPage);
+  const paginatedPurchases = filteredPurchases.slice(startIndex, endIndex);
+  const totalPurchasePages = Math.ceil(filteredPurchases.length / recordsPerPage);
+  const uniqueItemNames = getUniqueItemNames();
 
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-800">Equipment Purchases</h2>
+      </div>
+
+      {/* Filters */}
+      <div className="mb-4 p-4 bg-gray-50 rounded-lg border">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Complex</label>
+            <select
+              value={complexFilter}
+              onChange={(e) => {
+                setComplexFilter(e.target.value);
+                setCurrentPage(prev => ({ ...prev, equipmentPurchases: 1 }));
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary"
+            >
+              <option value="all">All Complexes</option>
+              {complexes.filter(c => c.status !== 'deleted').map(complex => (
+                <option key={complex.id} value={complex.id}>{complex.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Item</label>
+            <select
+              value={itemFilter}
+              onChange={(e) => {
+                setItemFilter(e.target.value);
+                setCurrentPage(prev => ({ ...prev, equipmentPurchases: 1 }));
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary"
+            >
+              <option value="all">All Items</option>
+              {uniqueItemNames.map(itemName => (
+                <option key={itemName} value={itemName}>{itemName}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setCurrentPage(prev => ({ ...prev, equipmentPurchases: 1 }));
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary"
+            >
+              <option value="all">All Status</option>
+              <option value="pending">Pending</option>
+              <option value="confirmed">Confirmed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+            <div className="flex gap-2">
+              <input
+                type="date"
+                value={dateFilter}
+                onChange={(e) => {
+                  setDateFilter(e.target.value);
+                  setCurrentPage(prev => ({ ...prev, equipmentPurchases: 1 }));
+                }}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary"
+              />
+              {dateFilter && (
+                <button
+                  onClick={() => {
+                    setDateFilter('');
+                    setCurrentPage(prev => ({ ...prev, equipmentPurchases: 1 }));
+                  }}
+                  className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  title="Clear date filter"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="overflow-x-auto">

@@ -24,7 +24,8 @@ const UserBookings = ({
     setCurrentPage(1);
   }, [bookingTab]);
 
-  const getComplexPriceWithDiscount = (booking) => {
+  // Calculate complex price with discount (without coach)
+  const getComplexPriceOnly = (booking) => {
     const pricePerHour = booking.complex?.pricePerHour || 50;
     const hours = booking.hours || 1;
     let courtTotal = pricePerHour * hours;
@@ -39,13 +40,22 @@ const UserBookings = ({
       }
     }
     
-    let total = courtTotal;
+    return courtTotal;
+  };
+
+  // Calculate coach price
+  const getCoachPrice = (booking) => {
     if (booking.coachRequired && booking.coachId && booking.coach) {
       const coachPrice = booking.coach.price || 30;
-      total += coachPrice * hours;
+      const hours = booking.hours || 1;
+      return coachPrice * hours;
     }
-    
-    return total;
+    return 0;
+  };
+
+  // Calculate total price (complex + coach)
+  const getComplexPriceWithDiscount = (booking) => {
+    return getComplexPriceOnly(booking) + getCoachPrice(booking);
   };
 
   const getCurrentBookingData = () => {
@@ -217,7 +227,7 @@ const UserBookings = ({
                           </h3>
                           <p className="text-xs text-gray-600 mb-1">{getCourtNumber(booking)}</p>
                           <p className="text-xs text-gray-600">
-                            {getGuests(booking)} Guests • {booking.hours || 1} {booking.hours === 1 ? 'Hr' : 'Hrs'}
+                            {booking.hours || 1} {booking.hours === 1 ? 'Hr' : 'Hrs'}
                           </p>
                           <p className="text-xs text-gray-600 mt-1">
                             {formatDateTime(booking.date, booking.timeSlot)}
@@ -427,9 +437,6 @@ const UserBookings = ({
                           </p>
                           
                           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-1 sm:gap-4 mb-2">
-                            <span className="text-xs sm:text-sm text-gray-600">
-                              <span className="font-semibold">Guests:</span> {getGuests(booking)}
-                            </span>
                             <span className="text-xs sm:text-sm text-gray-600">
                               <span className="font-semibold">Duration:</span> {booking.hours || 1} {booking.hours === 1 ? 'Hr' : 'Hrs'}
                             </span>
@@ -694,10 +701,6 @@ const UserBookings = ({
                   <p className="text-gray-800">{selectedBooking.hours || 1}</p>
                 </div>
                 <div>
-                  <label className="block text-gray-600 text-sm font-semibold mb-1">Guests</label>
-                  <p className="text-gray-800">{getGuests(selectedBooking)}</p>
-                </div>
-                <div>
                   <label className="block text-gray-600 text-sm font-semibold mb-1">Status</label>
                   <span className={`inline-block px-3 py-1 rounded text-sm ${
                     selectedBooking.status === 'confirmed' 
@@ -709,7 +712,13 @@ const UserBookings = ({
                     {selectedBooking.status || 'pending'}
                   </span>
                 </div>
-                {selectedBooking.coachRequired && (
+                {selectedBooking.coachRequired && selectedBooking.coach && (
+                  <div>
+                    <label className="block text-gray-600 text-sm font-semibold mb-1">Coach</label>
+                    <p className="text-gray-800">{selectedBooking.coach.name || 'N/A'}</p>
+                  </div>
+                )}
+                {selectedBooking.coachRequired && !selectedBooking.coach && (
                   <div>
                     <label className="block text-gray-600 text-sm font-semibold mb-1">Coach Required</label>
                     <p className="text-gray-800">Yes</p>
@@ -722,9 +731,21 @@ const UserBookings = ({
                   </div>
                 )}
               </div>
-              <div className="pt-4 border-t border-gray-200">
-                <label className="block text-gray-600 text-sm font-semibold mb-1">Total Amount</label>
-                <p className="text-primary text-xl font-bold">£{getComplexPriceWithDiscount(selectedBooking).toFixed(2)}</p>
+              <div className="pt-4 border-t border-gray-200 space-y-2">
+                <div className="flex justify-between items-center">
+                  <label className="block text-gray-600 text-sm font-semibold">Complex Price</label>
+                  <p className="text-gray-800 font-semibold">£{getComplexPriceOnly(selectedBooking).toFixed(2)}</p>
+                </div>
+                {selectedBooking.coachRequired && selectedBooking.coach && getCoachPrice(selectedBooking) > 0 && (
+                  <div className="flex justify-between items-center">
+                    <label className="block text-gray-600 text-sm font-semibold">Coach Price</label>
+                    <p className="text-gray-800 font-semibold">£{getCoachPrice(selectedBooking).toFixed(2)}</p>
+                  </div>
+                )}
+                <div className="flex justify-between items-center pt-2 border-t border-gray-200">
+                  <label className="block text-gray-600 text-sm font-semibold">Total Amount</label>
+                  <p className="text-primary text-xl font-bold">£{getComplexPriceWithDiscount(selectedBooking).toFixed(2)}</p>
+                </div>
               </div>
               
               <div className="pt-4 border-t border-gray-200">

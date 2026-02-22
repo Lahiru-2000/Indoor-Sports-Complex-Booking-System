@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { HiTrash, HiEye, HiUsers, HiCheck, HiX, HiTrendingUp } from 'react-icons/hi';
@@ -5,6 +6,7 @@ import Swal from 'sweetalert2';
 
 const AdminUsers = ({
   users,
+  bookings,
   onRefresh,
   setViewingRecord,
   setViewModalType,
@@ -12,6 +14,9 @@ const AdminUsers = ({
   setCurrentPage,
   recordsPerPage
 }) => {
+  const [packageFilter, setPackageFilter] = useState('all');
+  const [dateSort, setDateSort] = useState('none');
+  const [bookingsSort, setBookingsSort] = useState('none');
   const getUserStats = () => {
     const now = new Date();
     const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -157,7 +162,62 @@ const AdminUsers = ({
     }
   };
 
-  const paginatedUsers = getPaginatedData(users);
+  // Count bookings per user
+  const getUserBookingCount = (userId) => {
+    if (!bookings || !Array.isArray(bookings)) return 0;
+    return bookings.filter(booking => booking.userId === userId && booking.status !== 'cancelled').length;
+  };
+
+  const getFilteredAndSortedUsers = () => {
+    let filtered = users.map(user => ({
+      ...user,
+      bookingCount: getUserBookingCount(user.id)
+    }));
+
+    // Filter by package
+    if (packageFilter !== 'all') {
+      filtered = filtered.filter(user => {
+        const userPackage = user.package || 'basic';
+        if (packageFilter === 'basic') {
+          return !userPackage || userPackage === 'basic' || userPackage === 'normal';
+        }
+        if (packageFilter === 'silver') {
+          return userPackage === 'silver' || userPackage === 'package2';
+        }
+        if (packageFilter === 'gold') {
+          return userPackage === 'gold' || userPackage === 'package3';
+        }
+        return userPackage === packageFilter;
+      });
+    }
+
+    // Sort by date
+    if (dateSort === 'firstToLast') {
+      filtered = [...filtered].sort((a, b) => {
+        const aTime = a.createdAt?.toDate?.()?.getTime() || a.createdAt || 0;
+        const bTime = b.createdAt?.toDate?.()?.getTime() || b.createdAt || 0;
+        return aTime - bTime;
+      });
+    } else if (dateSort === 'lastToFirst') {
+      filtered = [...filtered].sort((a, b) => {
+        const aTime = a.createdAt?.toDate?.()?.getTime() || a.createdAt || 0;
+        const bTime = b.createdAt?.toDate?.()?.getTime() || b.createdAt || 0;
+        return bTime - aTime;
+      });
+    }
+
+    // Sort by bookings count
+    if (bookingsSort === 'mostBookings') {
+      filtered = [...filtered].sort((a, b) => b.bookingCount - a.bookingCount);
+    } else if (bookingsSort === 'lowestBookings') {
+      filtered = [...filtered].sort((a, b) => a.bookingCount - b.bookingCount);
+    }
+
+    return filtered;
+  };
+
+  const filteredUsers = getFilteredAndSortedUsers();
+  const paginatedUsers = getPaginatedData(filteredUsers);
   const userStats = getUserStats();
 
   return (
@@ -208,6 +268,58 @@ const AdminUsers = ({
         </div>
       </div>
 
+      {/* Filters */}
+      <div className="mb-4 p-4 bg-gray-50 rounded-lg border">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Package</label>
+            <select
+              value={packageFilter}
+              onChange={(e) => {
+                setPackageFilter(e.target.value);
+                setCurrentPage(prev => ({ ...prev, users: 1 }));
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary"
+            >
+              <option value="all">All Packages</option>
+              <option value="basic">Basic</option>
+              <option value="silver">Silver</option>
+              <option value="gold">Gold</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Created Date</label>
+            <select
+              value={dateSort}
+              onChange={(e) => {
+                setDateSort(e.target.value);
+                setCurrentPage(prev => ({ ...prev, users: 1 }));
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary"
+            >
+              <option value="none">No Sort</option>
+              <option value="firstToLast">First to Last</option>
+              <option value="lastToFirst">Last to First</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Bookings</label>
+            <select
+              value={bookingsSort}
+              onChange={(e) => {
+                setBookingsSort(e.target.value);
+                setCurrentPage(prev => ({ ...prev, users: 1 }));
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary"
+            >
+              <option value="none">No Sort</option>
+              <option value="mostBookings">Most Bookings</option>
+              <option value="lowestBookings">Lowest Bookings</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
@@ -215,27 +327,47 @@ const AdminUsers = ({
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Package</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {paginatedUsers.length === 0 ? (
               <tr>
-                <td colSpan="4" className="px-6 py-4 text-center text-gray-500">No users found.</td>
+                <td colSpan="5" className="px-6 py-4 text-center text-gray-500">No users found.</td>
               </tr>
             ) : (
-              paginatedUsers.map((u) => (
-                <tr key={u.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{u.name || 'No name'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{u.email}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                      u.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-800'
-                    }`}>
-                      {u.role || 'user'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+              paginatedUsers.map((u) => {
+                const userPackage = u.package || 'basic';
+                const getPackageDisplayName = (pkg) => {
+                  if (!pkg || pkg === 'basic' || pkg === 'normal') return 'Basic';
+                  if (pkg === 'silver' || pkg === 'package2') return 'Silver';
+                  if (pkg === 'gold' || pkg === 'package3') return 'Gold';
+                  return pkg.charAt(0).toUpperCase() + pkg.slice(1);
+                };
+                const getPackageColor = (pkg) => {
+                  if (!pkg || pkg === 'basic' || pkg === 'normal') return 'bg-gray-100 text-gray-800';
+                  if (pkg === 'silver' || pkg === 'package2') return 'bg-gray-200 text-gray-700';
+                  if (pkg === 'gold' || pkg === 'package3') return 'bg-yellow-100 text-yellow-800';
+                  return 'bg-blue-100 text-blue-800';
+                };
+                return (
+                  <tr key={u.id}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{u.name || 'No name'}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{u.email}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                        u.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {u.role || 'user'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getPackageColor(userPackage)}`}>
+                        {getPackageDisplayName(userPackage)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex gap-2">
                       <button
                         onClick={() => {
@@ -253,12 +385,13 @@ const AdminUsers = ({
                     </div>
                   </td>
                 </tr>
-              ))
+                );
+              })
             )}
           </tbody>
         </table>
       </div>
-      <PaginationControls data={users} />
+      <PaginationControls data={filteredUsers} />
     </div>
   );
 };

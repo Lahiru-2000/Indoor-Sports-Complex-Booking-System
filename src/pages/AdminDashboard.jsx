@@ -104,15 +104,35 @@ const AdminDashboard = () => {
           }
         });
 
+        const complexesMap = {};
+        complexesSnapshot.docs.forEach(docSnap => {
+          const complexData = docSnap.data();
+          if (complexData.status !== 'deleted') {
+            complexesMap[docSnap.id] = { id: docSnap.id, ...complexData };
+          }
+        });
+
         const bookingsData = bookingsSnapshot.docs
           .map(doc => {
             const bookingData = { id: doc.id, ...doc.data() };
             if (bookingData.userId && usersMap[bookingData.userId]) {
               bookingData.userEmail = usersMap[bookingData.userId];
             }
+            if (bookingData.complexId) {
+              if (complexesMap[bookingData.complexId]) {
+                bookingData.complex = complexesMap[bookingData.complexId];
+              } else {
+                console.warn(`Complex not found for booking ${bookingData.id}: complexId=${bookingData.complexId}`);
+              }
+            }
             return bookingData;
           })
-          .filter(booking => booking.status !== 'deleted');
+          .filter(booking => booking.status !== 'deleted')
+          .sort((a, b) => {
+            const aTime = a.createdAt?.toDate?.()?.getTime() || a.createdAt || 0;
+            const bTime = b.createdAt?.toDate?.()?.getTime() || b.createdAt || 0;
+            return bTime - aTime; // Most recent first
+          });
         setBookings(bookingsData);
 
         const complexesData = complexesSnapshot.docs
@@ -120,8 +140,19 @@ const AdminDashboard = () => {
           .filter(complex => complex.status !== 'deleted');
         setComplexes(complexesData);
 
+        // Reuse complexesMap that was already created for bookings
         const coachesData = coachesSnapshot.docs
-          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .map(doc => {
+            const coachData = { id: doc.id, ...doc.data() };
+            if (coachData.complexId) {
+              if (complexesMap[coachData.complexId]) {
+                coachData.complex = complexesMap[coachData.complexId];
+              } else {
+                console.warn(`Complex not found for coach ${coachData.id}: complexId=${coachData.complexId}`);
+              }
+            }
+            return coachData;
+          })
           .filter(coach => coach.status !== 'deleted');
         setCoaches(coachesData);
 
@@ -140,12 +171,24 @@ const AdminDashboard = () => {
           .filter(item => item.status !== 'deleted');
         setFoodItems(foodData);
       } else if (activeTab === 'bookings') {
-        const usersSnapshot = await getDocs(collection(db, 'users'));
+        const [usersSnapshot, complexesSnapshot] = await Promise.all([
+          getDocs(collection(db, 'users')),
+          getDocs(collection(db, 'complexes'))
+        ]);
+        
         const usersMap = {};
         usersSnapshot.docs.forEach(docSnap => {
           const userData = docSnap.data();
           if (userData.status !== 'deleted') {
             usersMap[docSnap.id] = userData.email || '';
+          }
+        });
+
+        const complexesMap = {};
+        complexesSnapshot.docs.forEach(docSnap => {
+          const complexData = docSnap.data();
+          if (complexData.status !== 'deleted') {
+            complexesMap[docSnap.id] = { id: docSnap.id, ...complexData };
           }
         });
 
@@ -155,6 +198,13 @@ const AdminDashboard = () => {
             const bookingData = { id: doc.id, ...doc.data() };
             if (bookingData.userId && usersMap[bookingData.userId]) {
               bookingData.userEmail = usersMap[bookingData.userId];
+            }
+            if (bookingData.complexId) {
+              if (complexesMap[bookingData.complexId]) {
+                bookingData.complex = complexesMap[bookingData.complexId];
+              } else {
+                console.warn(`Complex not found for booking ${bookingData.id}: complexId=${bookingData.complexId}`);
+              }
             }
             return bookingData;
           })
@@ -181,8 +231,27 @@ const AdminDashboard = () => {
           getDocs(collection(db, 'coaches')),
           getDocs(collection(db, 'complexes'))
         ]);
+        
+        const complexesMap = {};
+        complexesSnapshot.docs.forEach(docSnap => {
+          const complexData = docSnap.data();
+          if (complexData.status !== 'deleted') {
+            complexesMap[docSnap.id] = { id: docSnap.id, ...complexData };
+          }
+        });
+        
         const coachesData = coachesSnapshot.docs
-          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .map(doc => {
+            const coachData = { id: doc.id, ...doc.data() };
+            if (coachData.complexId) {
+              if (complexesMap[coachData.complexId]) {
+                coachData.complex = complexesMap[coachData.complexId];
+              } else {
+                console.warn(`Complex not found for coach ${coachData.id}: complexId=${coachData.complexId}`);
+              }
+            }
+            return coachData;
+          })
           .filter(coach => coach.status !== 'deleted')
           .sort((a, b) => {
             const aTime = a.createdAt?.toDate?.()?.getTime() || a.createdAt || 0;
@@ -196,7 +265,10 @@ const AdminDashboard = () => {
           .filter(complex => complex.status !== 'deleted');
         setComplexes(complexesData);
       } else if (activeTab === 'users') {
-        const usersSnapshot = await getDocs(collection(db, 'users'));
+        const [usersSnapshot, bookingsSnapshot] = await Promise.all([
+          getDocs(collection(db, 'users')),
+          getDocs(collection(db, 'bookings'))
+        ]);
         const usersData = usersSnapshot.docs
           .map(doc => ({ id: doc.id, ...doc.data() }))
           .filter(user => user.status !== 'deleted' && user.role !== 'admin')
@@ -206,8 +278,16 @@ const AdminDashboard = () => {
             return bTime - aTime;
           });
         setUsers(usersData);
+        
+        const bookingsData = bookingsSnapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .filter(booking => booking.status !== 'deleted');
+        setBookings(bookingsData);
       } else if (activeTab === 'equipment') {
-        const itemsSnapshot = await getDocs(collection(db, 'sportsItems'));
+        const [itemsSnapshot, complexesSnapshot] = await Promise.all([
+          getDocs(collection(db, 'sportsItems')),
+          getDocs(collection(db, 'complexes'))
+        ]);
         const itemsData = itemsSnapshot.docs
           .map(doc => ({ id: doc.id, ...doc.data() }))
           .filter(item => item.status !== 'deleted')
@@ -217,6 +297,11 @@ const AdminDashboard = () => {
             return bTime - aTime;
           });
         setSportsItems(itemsData);
+        
+        const complexesData = complexesSnapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .filter(complex => complex.status !== 'deleted');
+        setComplexes(complexesData);
       } else if (activeTab === 'restaurant') {
           const foodSnapshot = await getDocs(collection(db, 'foodItems'));
         const foodData = foodSnapshot.docs
@@ -241,6 +326,11 @@ const AdminDashboard = () => {
             complexesMap[docSnap.id] = { id: docSnap.id, ...complexData };
           }
         });
+
+        const complexesData = complexesSnapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .filter(complex => complex.status !== 'deleted');
+        setComplexes(complexesData);
 
         const usersMap = {};
         usersSnapshot.docs.forEach(docSnap => {
@@ -287,6 +377,11 @@ const AdminDashboard = () => {
             complexesMap[docSnap.id] = { id: docSnap.id, ...complexData };
           }
         });
+
+        const complexesData = complexesSnapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .filter(complex => complex.status !== 'deleted');
+        setComplexes(complexesData);
 
         const usersMap = {};
         usersSnapshot.docs.forEach(docSnap => {
@@ -679,6 +774,7 @@ const AdminDashboard = () => {
               {activeTab === 'users' && (
                 <AdminUsers
                   users={users}
+                  bookings={bookings}
                   onRefresh={fetchData}
                   setViewingRecord={setViewingRecord}
                   setViewModalType={setViewModalType}
@@ -691,6 +787,7 @@ const AdminDashboard = () => {
               {activeTab === 'equipment' && (
                 <AdminEquipment
                   sportsItems={sportsItems}
+                  complexes={complexes}
                   onRefresh={fetchData}
                   availableEquipmentCategories={availableEquipmentCategories}
                   onFetchEquipmentCategories={fetchEquipmentCategories}
@@ -719,6 +816,7 @@ const AdminDashboard = () => {
               {activeTab === 'restaurantPurchases' && (
                 <AdminRestaurantPurchases
                   restaurantPurchases={restaurantPurchases}
+                  complexes={complexes}
                   onRefresh={fetchData}
                   setViewingRecord={setViewingRecord}
                   setViewModalType={setViewModalType}
@@ -731,6 +829,7 @@ const AdminDashboard = () => {
               {activeTab === 'equipmentPurchases' && (
                 <AdminEquipmentPurchases
                   equipmentPurchases={equipmentPurchases}
+                  complexes={complexes}
                   onRefresh={fetchData}
                   setViewingRecord={setViewingRecord}
                   setViewModalType={setViewModalType}
@@ -791,6 +890,10 @@ const AdminDashboard = () => {
                   <div>
                     <label className="block text-gray-600 text-sm font-semibold mb-1">User Email</label>
                     <p className="text-gray-800">{viewingRecord.userEmail || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="block text-gray-600 text-sm font-semibold mb-1">Complex</label>
+                    <p className="text-gray-800">{viewingRecord.complex?.name || (viewingRecord.complexId ? `ID: ${viewingRecord.complexId}` : 'N/A')}</p>
                   </div>
                   <div>
                     <label className="block text-gray-600 text-sm font-semibold mb-1">Sport</label>
@@ -888,6 +991,18 @@ const AdminDashboard = () => {
                     <div>
                       <label className="block text-gray-600 text-sm font-semibold mb-1">Speciality</label>
                       <p className="text-gray-800">{viewingRecord.speciality || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <label className="block text-gray-600 text-sm font-semibold mb-1">Complex</label>
+                      <p className="text-gray-800">{viewingRecord.complex?.name || (viewingRecord.complexId ? `ID: ${viewingRecord.complexId}` : 'N/A')}</p>
+                    </div>
+                    <div>
+                      <label className="block text-gray-600 text-sm font-semibold mb-1">Sports</label>
+                      <p className="text-gray-800">
+                        {Array.isArray(viewingRecord.sports) && viewingRecord.sports.length > 0 
+                          ? viewingRecord.sports.join(', ') 
+                          : 'N/A'}
+                      </p>
                     </div>
                     <div>
                       <label className="block text-gray-600 text-sm font-semibold mb-1">Price</label>

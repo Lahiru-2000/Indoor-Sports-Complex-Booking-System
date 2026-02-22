@@ -44,7 +44,7 @@ const Restaurant = () => {
             id: doc.id,
             ...doc.data()
           }))
-          .filter(item => item.status !== 'deleted');
+          .filter(item => item.status !== 'deleted' && item.enabled !== false);
         setFoodItems(itemsData);
       } catch (error) {
         console.error('Error fetching food items:', error);
@@ -55,7 +55,7 @@ const Restaurant = () => {
               id: doc.id,
               ...doc.data()
             }))
-            .filter(item => item.status !== 'deleted');
+            .filter(item => item.status !== 'deleted' && item.enabled !== false);
           setFoodItems(drinksData);
         } catch (drinksError) {
           console.error('Error fetching drinks:', drinksError);

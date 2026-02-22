@@ -16,30 +16,72 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    e.stopPropagation();
+    
+    // Validate inputs
+    if (!email || !password) {
+      setError('Please fill in all fields');
+      return;
+    }
+
     setError('');
     setLoading(true);
 
     try {
+      console.log('Attempting to sign in...');
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      console.log('Sign in successful:', userCredential.user.uid);
+      
+      // Store login timestamp for session management
+      localStorage.setItem('loginTimestamp', Date.now().toString());
+      
+      // Wait a bit for auth state to update
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       try {
         const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
         if (userDoc.exists()) {
           const userData = userDoc.data();
+          console.log('User role:', userData.role);
           if (userData.role === 'admin') {
-            navigate('/admin/dashboard');
+            console.log('Navigating to admin dashboard');
+            // Use window.location for immediate navigation
+            window.location.href = '/admin/dashboard';
           } else {
-            navigate('/user/dashboard');
+            console.log('Navigating to user dashboard');
+            window.location.href = '/user/dashboard';
           }
         } else {
-          navigate('/user/dashboard');
+          // User document doesn't exist, default to user dashboard
+          console.log('User document does not exist, navigating to user dashboard');
+          window.location.href = '/user/dashboard';
         }
       } catch (err) {
-        console.error('Error fetching user data:', err);
-        navigate('/user/dashboard');
+        // Handle permission errors gracefully - user might not have access to their own document
+        // or document might not exist yet. Default to user dashboard.
+        console.warn('Error fetching user data (non-critical):', err.code || err.message);
+        console.log('Navigating to user dashboard despite error');
+        // Use window.location for immediate navigation
+        window.location.href = '/user/dashboard';
       }
     } catch (err) {
-      setError(err.message);
-    } finally {
+      console.error('Login error:', err);
+      let errorMessage = 'Failed to login. Please check your credentials.';
+      
+      // Provide more specific error messages
+      if (err.code === 'auth/user-not-found') {
+        errorMessage = 'No account found with this email.';
+      } else if (err.code === 'auth/wrong-password') {
+        errorMessage = 'Incorrect password.';
+      } else if (err.code === 'auth/invalid-email') {
+        errorMessage = 'Invalid email address.';
+      } else if (err.code === 'auth/too-many-requests') {
+        errorMessage = 'Too many failed attempts. Please try again later.';
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
       setLoading(false);
     }
   };
@@ -62,9 +104,15 @@ const Login = () => {
           
           {error && (
             <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
-              {error}
+              <strong>Error:</strong> {error}
             </div>
           )}
+          
+          {/* {loading && (
+            <div className="mb-4 p-3 bg-blue-100 border border-blue-400 text-blue-700 rounded">
+              Please wait, logging in...
+            </div>
+          )} */}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -112,7 +160,13 @@ const Login = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-primary text-white rounded-lg hover:bg-primary-dark transition font-semibold disabled:opacity-50"
+              onClick={(e) => {
+                // Ensure form submission happens
+                if (!loading) {
+                  console.log('Login button clicked');
+                }
+              }}
+              className="w-full py-3 bg-primary text-white rounded-lg hover:bg-primary-dark transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Logging in...' : 'Login'}
             </button>

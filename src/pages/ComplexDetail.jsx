@@ -18,7 +18,7 @@ const ComplexDetail = ({ user }) => {
         
         if (docSnap.exists()) {
           const complexData = { id: docSnap.id, ...docSnap.data() };
-          if (complexData.status === 'deleted') {
+          if (complexData.status === 'deleted' || complexData.enabled === false) {
             setComplex(null);
             return;
           }

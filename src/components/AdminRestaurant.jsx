@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { collection, doc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase/config';
-import { HiPencil, HiTrash, HiEye, HiEmojiHappy, HiFolder, HiTrendingUp } from 'react-icons/hi';
+import { HiPencil, HiTrash, HiEye, HiEmojiHappy, HiFolder, HiTrendingUp, HiCheckCircle, HiXCircle } from 'react-icons/hi';
 import Swal from 'sweetalert2';
 
 const AdminRestaurant = ({
@@ -25,6 +25,9 @@ const AdminRestaurant = ({
     description: '',
     image: ''
   });
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [priceSort, setPriceSort] = useState('none');
 
   useEffect(() => {
     if (showFoodForm) {
@@ -162,7 +165,8 @@ const AdminRestaurant = ({
         category: foodForm.category,
         price: parseFloat(foodForm.price) || 0,
         description: foodForm.description || '',
-        image: foodForm.image || ''
+        image: foodForm.image || '',
+        enabled: foodForm.enabled !== undefined ? foodForm.enabled : true
       };
 
       if (editingFood) {
@@ -170,13 +174,14 @@ const AdminRestaurant = ({
       } else {
         await addDoc(collection(db, 'foodItems'), {
           ...foodData,
+          enabled: true,
           createdAt: serverTimestamp()
         });
       }
 
       setShowFoodForm(false);
       setEditingFood(null);
-      setFoodForm({ name: '', category: '', price: '', description: '', image: '' });
+      setFoodForm({ name: '', category: '', price: '', description: '', image: '', enabled: true });
       onRefresh();
     } catch (error) {
       console.error('Error saving food item:', error);
@@ -196,7 +201,8 @@ const AdminRestaurant = ({
       category: item.category || '',
       price: item.price?.toString() || '',
       description: item.description || '',
-      image: item.image || ''
+      image: item.image || '',
+      enabled: item.enabled !== undefined ? item.enabled : true
     });
     setShowFoodForm(true);
   };
@@ -220,6 +226,52 @@ const AdminRestaurant = ({
       console.error('Error deleting food item:', error);
     }
   };
+
+  const handleToggleEnabled = async (item) => {
+    try {
+      const newEnabledStatus = !(item.enabled !== false); // Default to true if undefined
+      await updateDoc(doc(db, 'foodItems', item.id), { enabled: newEnabledStatus });
+      onRefresh();
+    } catch (error) {
+      console.error('Error toggling food item enabled status:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Update Failed',
+        text: 'Error updating food item status. Please try again.',
+        confirmButtonColor: '#10b981'
+      });
+    }
+  };
+
+  const getFilteredFoodItems = () => {
+    let filtered = foodItems;
+
+    // Filter by status (enabled/disabled)
+    if (statusFilter !== 'all') {
+      if (statusFilter === 'enabled') {
+        filtered = filtered.filter(item => item.enabled !== false);
+      } else if (statusFilter === 'disabled') {
+        filtered = filtered.filter(item => item.enabled === false);
+      }
+    }
+
+    // Filter by category
+    if (categoryFilter !== 'all') {
+      filtered = filtered.filter(item => item.category === categoryFilter);
+    }
+
+    // Sort by price
+    if (priceSort === 'lowToHigh') {
+      filtered = [...filtered].sort((a, b) => (a.price || 0) - (b.price || 0));
+    } else if (priceSort === 'highToLow') {
+      filtered = [...filtered].sort((a, b) => (b.price || 0) - (a.price || 0));
+    }
+
+    return filtered;
+  };
+
+  const filteredFoodItems = getFilteredFoodItems();
+  const paginatedFood = getPaginatedData(filteredFoodItems);
 
   const handleAddFoodCategory = async () => {
     if (!newFoodCategoryName.trim()) return;
@@ -248,7 +300,6 @@ const AdminRestaurant = ({
     }
   };
 
-  const paginatedFood = getPaginatedData(foodItems);
   const foodStats = getFoodStats();
 
   return (
@@ -258,7 +309,7 @@ const AdminRestaurant = ({
         <button
           onClick={() => {
             setEditingFood(null);
-            setFoodForm({ name: '', category: '', price: '', description: '', image: '' });
+            setFoodForm({ name: '', category: '', price: '', description: '', image: '', enabled: true });
             setShowFoodForm(true);
           }}
           className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition"
@@ -309,6 +360,58 @@ const AdminRestaurant = ({
         </div>
       </div>
 
+      {/* Filters */}
+      <div className="mb-4 p-4 bg-gray-50 rounded-lg border">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setCurrentPage(prev => ({ ...prev, restaurant: 1 }));
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary"
+            >
+              <option value="all">All Status</option>
+              <option value="enabled">Enabled</option>
+              <option value="disabled">Disabled</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+            <select
+              value={categoryFilter}
+              onChange={(e) => {
+                setCategoryFilter(e.target.value);
+                setCurrentPage(prev => ({ ...prev, restaurant: 1 }));
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary"
+            >
+              <option value="all">All Categories</option>
+              {[...new Set(foodItems.map(item => item.category).filter(Boolean))].sort().map(category => (
+                <option key={category} value={category}>{category}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Price</label>
+            <select
+              value={priceSort}
+              onChange={(e) => {
+                setPriceSort(e.target.value);
+                setCurrentPage(prev => ({ ...prev, restaurant: 1 }));
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary"
+            >
+              <option value="none">No Sort</option>
+              <option value="lowToHigh">Low to High</option>
+              <option value="highToLow">High to Low</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
@@ -326,8 +429,13 @@ const AdminRestaurant = ({
               </tr>
             ) : (
               paginatedFood.map((item) => (
-                <tr key={item.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.name}</td>
+                <tr key={item.id} className={item.enabled === false ? 'opacity-60 bg-gray-50' : ''}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {item.name}
+                    {item.enabled === false && (
+                      <span className="ml-2 px-2 py-0.5 text-xs font-semibold rounded bg-gray-200 text-gray-600">Disabled</span>
+                    )}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 capitalize">{item.category || 'N/A'}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">£{item.price?.toFixed(2) || '0.00'}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -345,6 +453,13 @@ const AdminRestaurant = ({
                       <button onClick={() => handleEditFood(item)} className="text-green-600 hover:text-green-900" title="Edit">
                         <HiPencil className="w-5 h-5" />
                       </button>
+                      <button 
+                        onClick={() => handleToggleEnabled(item)} 
+                        className={item.enabled !== false ? "text-yellow-600 hover:text-yellow-900" : "text-gray-400 hover:text-gray-600"} 
+                        title={item.enabled !== false ? "Disable" : "Enable"}
+                      >
+                        {item.enabled !== false ? <HiXCircle className="w-5 h-5" /> : <HiCheckCircle className="w-5 h-5" />}
+                      </button>
                       <button onClick={() => handleDeleteFood(item.id)} className="text-red-600 hover:text-red-900" title="Delete">
                         <HiTrash className="w-5 h-5" />
                       </button>
@@ -356,7 +471,7 @@ const AdminRestaurant = ({
           </tbody>
         </table>
       </div>
-      <PaginationControls data={foodItems} />
+      <PaginationControls data={filteredFoodItems} />
 
       {/* Food Form Modal */}
       {showFoodForm && (
@@ -368,7 +483,7 @@ const AdminRestaurant = ({
                 onClick={() => {
                   setShowFoodForm(false);
                   setEditingFood(null);
-                  setFoodForm({ name: '', category: '', price: '', description: '', image: '' });
+                  setFoodForm({ name: '', category: '', price: '', description: '', image: '', enabled: true });
                 }}
                 className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
               >

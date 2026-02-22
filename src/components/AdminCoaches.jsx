@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { collection, doc, updateDoc, deleteDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase/config';
-import { HiPencil, HiTrash, HiEye } from 'react-icons/hi';
+import { HiPencil, HiTrash, HiEye, HiCheckCircle, HiXCircle } from 'react-icons/hi';
 import Swal from 'sweetalert2';
 
 const AdminCoaches = ({
@@ -28,8 +28,15 @@ const AdminCoaches = ({
     experience: '',
     sports: []
   });
+  const [sportFilter, setSportFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [priceSort, setPriceSort] = useState('none');
 
-  // Fetch sports when coach form opens (if not already loaded)
+  // Fetch sports when component loads and when coach form opens
+  useEffect(() => {
+    onFetchSports();
+  }, [onFetchSports]);
+
   useEffect(() => {
     if (showCoachForm) {
       onFetchSports();
@@ -150,7 +157,8 @@ const AdminCoaches = ({
         bio: coachForm.bio || '',
         image: coachForm.image || '',
         experience: coachForm.experience || '',
-        sports: coachForm.sports || []
+        sports: coachForm.sports || [],
+        enabled: coachForm.enabled !== undefined ? coachForm.enabled : true
       };
 
       if (editingCoach) {
@@ -158,13 +166,14 @@ const AdminCoaches = ({
       } else {
         await addDoc(collection(db, 'coaches'), {
           ...coachData,
+          enabled: true,
           createdAt: serverTimestamp()
         });
       }
 
       setShowCoachForm(false);
       setEditingCoach(null);
-      setCoachForm({ name: '', price: '', complexId: '', speciality: '', bio: '', image: '', experience: '', sports: [] });
+      setCoachForm({ name: '', price: '', complexId: '', speciality: '', bio: '', image: '', experience: '', sports: [], enabled: true });
       onRefresh();
     } catch (error) {
       console.error('Error saving coach:', error);
@@ -187,7 +196,8 @@ const AdminCoaches = ({
       bio: coach.bio || '',
       image: coach.image || '',
       experience: coach.experience || '',
-      sports: coach.sports || []
+      sports: coach.sports || [],
+      enabled: coach.enabled !== undefined ? coach.enabled : true
     });
     setShowCoachForm(true);
   };
@@ -212,6 +222,22 @@ const AdminCoaches = ({
     }
   };
 
+  const handleToggleEnabled = async (coach) => {
+    try {
+      const newEnabledStatus = !(coach.enabled !== false); // Default to true if undefined
+      await updateDoc(doc(db, 'coaches', coach.id), { enabled: newEnabledStatus });
+      onRefresh();
+    } catch (error) {
+      console.error('Error toggling coach enabled status:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Update Failed',
+        text: 'Error updating coach status. Please try again.',
+        confirmButtonColor: '#10b981'
+      });
+    }
+  };
+
   const handleCoachSportToggle = (sport) => {
     const currentSports = coachForm.sports || [];
     if (currentSports.some(s => s.toLowerCase() === sport.toLowerCase())) {
@@ -227,7 +253,55 @@ const AdminCoaches = ({
     }
   };
 
-  const paginatedCoaches = getPaginatedData(coaches);
+  const getFilteredCoaches = () => {
+    let filtered = coaches;
+
+    // Filter by sport
+    if (sportFilter !== 'all') {
+      filtered = filtered.filter(coach => {
+        const coachSports = coach.sports || [];
+        return coachSports.some(s => s.toLowerCase() === sportFilter.toLowerCase());
+      });
+    }
+
+    // Filter by status (enabled/disabled)
+    if (statusFilter !== 'all') {
+      if (statusFilter === 'enabled') {
+        filtered = filtered.filter(coach => coach.enabled !== false);
+      } else if (statusFilter === 'disabled') {
+        filtered = filtered.filter(coach => coach.enabled === false);
+      }
+    }
+
+    // Sort by price
+    if (priceSort === 'lowToHigh') {
+      filtered = [...filtered].sort((a, b) => (a.price || 0) - (b.price || 0));
+    } else if (priceSort === 'highToLow') {
+      filtered = [...filtered].sort((a, b) => (b.price || 0) - (a.price || 0));
+    }
+
+    return filtered;
+  };
+
+  const filteredCoaches = getFilteredCoaches();
+  const paginatedCoaches = getPaginatedData(filteredCoaches);
+
+  // Get unique sports from coaches as fallback if availableSports is empty
+  const getAvailableSports = () => {
+    if (availableSports && availableSports.length > 0) {
+      return availableSports;
+    }
+    // Fallback: extract unique sports from coaches
+    const sportsSet = new Set();
+    coaches.forEach(coach => {
+      if (coach.sports && Array.isArray(coach.sports)) {
+        coach.sports.forEach(sport => sportsSet.add(sport));
+      }
+    });
+    return Array.from(sportsSet).sort();
+  };
+
+  const sportsForFilter = getAvailableSports();
 
   return (
     <div>
@@ -236,13 +310,65 @@ const AdminCoaches = ({
         <button
           onClick={() => {
             setEditingCoach(null);
-            setCoachForm({ name: '', price: '', complexId: '', speciality: '', bio: '', image: '', experience: '', sports: [] });
+            setCoachForm({ name: '', price: '', complexId: '', speciality: '', bio: '', image: '', experience: '', sports: [], enabled: true });
             setShowCoachForm(true);
           }}
           className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition"
         >
           Add Coach
         </button>
+      </div>
+
+      {/* Filters */}
+      <div className="mb-4 p-4 bg-gray-50 rounded-lg border">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Sport</label>
+            <select
+              value={sportFilter}
+              onChange={(e) => {
+                setSportFilter(e.target.value);
+                setCurrentPage(prev => ({ ...prev, coaches: 1 }));
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary"
+            >
+              <option value="all">All Sports</option>
+              {sportsForFilter.map(sport => (
+                <option key={sport} value={sport}>{sport}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setCurrentPage(prev => ({ ...prev, coaches: 1 }));
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary"
+            >
+              <option value="all">All Status</option>
+              <option value="enabled">Enabled</option>
+              <option value="disabled">Disabled</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Price</label>
+            <select
+              value={priceSort}
+              onChange={(e) => {
+                setPriceSort(e.target.value);
+                setCurrentPage(prev => ({ ...prev, coaches: 1 }));
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary"
+            >
+              <option value="none">No Sort</option>
+              <option value="lowToHigh">Low to High</option>
+              <option value="highToLow">High to Low</option>
+            </select>
+          </div>
+        </div>
       </div>
 
       <div className="overflow-x-auto">
@@ -262,8 +388,13 @@ const AdminCoaches = ({
               </tr>
             ) : (
               paginatedCoaches.map((coach) => (
-                <tr key={coach.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{coach.name}</td>
+                <tr key={coach.id} className={coach.enabled === false ? 'opacity-60 bg-gray-50' : ''}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {coach.name}
+                    {coach.enabled === false && (
+                      <span className="ml-2 px-2 py-0.5 text-xs font-semibold rounded bg-gray-200 text-gray-600">Disabled</span>
+                    )}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{coach.speciality || 'N/A'}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">£{coach.price?.toFixed(2) || '0.00'}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -281,6 +412,13 @@ const AdminCoaches = ({
                       <button onClick={() => handleEditCoach(coach)} className="text-green-600 hover:text-green-900" title="Edit">
                         <HiPencil className="w-5 h-5" />
                       </button>
+                      <button 
+                        onClick={() => handleToggleEnabled(coach)} 
+                        className={coach.enabled !== false ? "text-yellow-600 hover:text-yellow-900" : "text-gray-400 hover:text-gray-600"} 
+                        title={coach.enabled !== false ? "Disable" : "Enable"}
+                      >
+                        {coach.enabled !== false ? <HiXCircle className="w-5 h-5" /> : <HiCheckCircle className="w-5 h-5" />}
+                      </button>
                       <button onClick={() => handleDeleteCoach(coach.id)} className="text-red-600 hover:text-red-900" title="Delete">
                         <HiTrash className="w-5 h-5" />
                       </button>
@@ -292,7 +430,7 @@ const AdminCoaches = ({
           </tbody>
         </table>
       </div>
-      <PaginationControls data={coaches} />
+      <PaginationControls data={filteredCoaches} />
 
       {/* Coach Form Modal */}
       {showCoachForm && (

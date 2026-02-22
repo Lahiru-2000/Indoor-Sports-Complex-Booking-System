@@ -70,7 +70,19 @@ const Booking = () => {
       try {
         const complexDoc = await getDoc(doc(db, 'complexes', complexId));
         if (complexDoc.exists()) {
-          setComplex({ id: complexDoc.id, ...complexDoc.data() });
+          const complexData = { id: complexDoc.id, ...complexDoc.data() };
+          // Check if complex is disabled or deleted
+          if (complexData.status === 'deleted' || complexData.enabled === false) {
+            Swal.fire({
+              icon: 'error',
+              title: 'Complex Not Available',
+              text: 'This complex is currently not available for booking.',
+              confirmButtonColor: '#10b981'
+            });
+            navigate('/browse-complexes');
+            return;
+          }
+          setComplex(complexData);
         }
 
         if (user) {
@@ -160,15 +172,51 @@ const Booking = () => {
         const coachesSnapshot = await getDocs(coachesQuery);
         const fetchedCoaches = coachesSnapshot.docs
           .map(doc => ({ id: doc.id, ...doc.data() }))
-          .filter(coach => coach.status !== 'deleted');
+          .filter(coach => coach.status !== 'deleted' && coach.enabled !== false);
         
         // Store all coaches for this complex
         setAllCoaches(fetchedCoaches);
 
-        const itemsSnapshot = await getDocs(collection(db, 'sportsItems'));
-        setSportsItems(itemsSnapshot.docs
-          .map(doc => ({ id: doc.id, ...doc.data() }))
-          .filter(item => item.status !== 'deleted'));
+        // Fetch sports items filtered by complexId
+        const itemsQuery = query(
+          collection(db, 'sportsItems'),
+          where('complexId', '==', complexId)
+        );
+        try {
+          const itemsSnapshot = await getDocs(itemsQuery);
+          const filteredItems = itemsSnapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() }))
+            .filter(item => item.status !== 'deleted');
+          
+          // If no items found with complexId, try fetching all and filter client-side
+          if (filteredItems.length === 0) {
+            const allItemsSnapshot = await getDocs(collection(db, 'sportsItems'));
+            const allItems = allItemsSnapshot.docs
+              .map(doc => ({ id: doc.id, ...doc.data() }))
+              .filter(item => item.status !== 'deleted');
+            
+            // Filter items that either have matching complexId or no complexId (for backward compatibility)
+            const compatibleItems = allItems.filter(item => 
+              !item.complexId || item.complexId === complexId
+            );
+            setSportsItems(compatibleItems.length > 0 ? compatibleItems : allItems);
+          } else {
+            setSportsItems(filteredItems);
+          }
+        } catch (error) {
+          // If query fails (e.g., no complexId field), fetch all items and filter client-side
+          console.warn('Error fetching filtered items, fetching all items:', error);
+          const itemsSnapshot = await getDocs(collection(db, 'sportsItems'));
+          const allItems = itemsSnapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() }))
+            .filter(item => item.status !== 'deleted');
+          
+          // Filter items that either have matching complexId or no complexId (for backward compatibility)
+          const compatibleItems = allItems.filter(item => 
+            !item.complexId || item.complexId === complexId
+          );
+          setSportsItems(compatibleItems.length > 0 ? compatibleItems : allItems);
+        }
 
         const drinksSnapshot = await getDocs(collection(db, 'drinks'));
         setDrinks(drinksSnapshot.docs
@@ -379,6 +427,7 @@ const Booking = () => {
     if (complexHasSport) {
       // Filter coaches that have the selected sport in their sports array
       const filteredCoaches = allCoaches.filter(coach => {
+        if (coach.enabled === false) return false; // Filter out disabled coaches
         const coachSports = coach.sports || [];
         return coachSports.some(s => s.toLowerCase() === selectedSport);
       });

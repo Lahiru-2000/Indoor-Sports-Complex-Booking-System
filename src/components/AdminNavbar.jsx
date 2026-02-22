@@ -7,6 +7,8 @@ const AdminNavbar = ({ user }) => {
 
   const handleLogout = async () => {
     try {
+      // Clear session data
+      localStorage.removeItem('loginTimestamp');
       await signOut(auth);
       navigate('/');
     } catch (error) {

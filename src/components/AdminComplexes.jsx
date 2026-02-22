@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { collection, getDocs, doc, updateDoc, deleteDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase/config';
-import { HiPencil, HiTrash, HiEye } from 'react-icons/hi';
+import { HiPencil, HiTrash, HiEye, HiCheckCircle, HiXCircle } from 'react-icons/hi';
 import Swal from 'sweetalert2';
 
 const AdminComplexes = ({
@@ -27,6 +27,8 @@ const AdminComplexes = ({
     sports: [],
     featuresText: ''
   });
+  const [sportFilter, setSportFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   const getPaginatedData = (data) => {
     const current = currentPage['complexes'] || 1;
@@ -146,7 +148,8 @@ const AdminComplexes = ({
         image: complexForm.image,
         location: complexForm.location,
         sports: complexForm.sports || [],
-        features: features
+        features: features,
+        enabled: complexForm.enabled !== undefined ? complexForm.enabled : true
       };
 
       if (editingComplex) {
@@ -154,13 +157,14 @@ const AdminComplexes = ({
       } else {
         await addDoc(collection(db, 'complexes'), {
           ...complexData,
+          enabled: true,
           createdAt: serverTimestamp()
         });
       }
 
       setShowComplexForm(false);
       setEditingComplex(null);
-      setComplexForm({ name: '', description: '', pricePerHour: '', image: '', location: '', sports: [], featuresText: '' });
+      setComplexForm({ name: '', description: '', pricePerHour: '', image: '', location: '', sports: [], featuresText: '', enabled: true });
       onRefresh();
     } catch (error) {
       console.error('Error saving complex:', error);
@@ -182,7 +186,8 @@ const AdminComplexes = ({
       image: complex.image || '',
       location: complex.location || '',
       sports: complex.sports || [],
-      featuresText: Array.isArray(complex.features) ? complex.features.join('\n') : ''
+      featuresText: Array.isArray(complex.features) ? complex.features.join('\n') : '',
+      enabled: complex.enabled !== undefined ? complex.enabled : true
     });
     setShowComplexForm(true);
   };
@@ -206,6 +211,64 @@ const AdminComplexes = ({
       console.error('Error deleting complex:', error);
     }
   };
+
+  const handleToggleEnabled = async (complex) => {
+    try {
+      const newEnabledStatus = !(complex.enabled !== false); // Default to true if undefined
+      await updateDoc(doc(db, 'complexes', complex.id), { enabled: newEnabledStatus });
+      onRefresh();
+    } catch (error) {
+      console.error('Error toggling complex enabled status:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Update Failed',
+        text: 'Error updating complex status. Please try again.',
+        confirmButtonColor: '#10b981'
+      });
+    }
+  };
+
+  const getFilteredComplexes = () => {
+    let filtered = complexes;
+
+    // Filter by sport
+    if (sportFilter !== 'all') {
+      filtered = filtered.filter(complex => {
+        const complexSports = complex.sports || [];
+        return complexSports.some(s => s.toLowerCase() === sportFilter.toLowerCase());
+      });
+    }
+
+    // Filter by status (enabled/disabled)
+    if (statusFilter !== 'all') {
+      if (statusFilter === 'enabled') {
+        filtered = filtered.filter(complex => complex.enabled !== false);
+      } else if (statusFilter === 'disabled') {
+        filtered = filtered.filter(complex => complex.enabled === false);
+      }
+    }
+
+    return filtered;
+  };
+
+  // Get unique sports from complexes as fallback if availableSports is empty
+  const getAvailableSports = () => {
+    if (availableSports && availableSports.length > 0) {
+      return availableSports;
+    }
+    // Fallback: extract unique sports from complexes
+    const sportsSet = new Set();
+    complexes.forEach(complex => {
+      if (complex.sports && Array.isArray(complex.sports)) {
+        complex.sports.forEach(sport => sportsSet.add(sport));
+      }
+    });
+    return Array.from(sportsSet).sort();
+  };
+
+  const sportsForFilter = getAvailableSports();
+  const filteredComplexes = getFilteredComplexes();
+  const paginatedComplexes = getPaginatedData(filteredComplexes);
 
   const handleAddSport = async () => {
     if (!newSportName.trim()) return;
@@ -249,8 +312,6 @@ const AdminComplexes = ({
     }
   };
 
-  const paginatedComplexes = getPaginatedData(complexes);
-
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
@@ -258,13 +319,50 @@ const AdminComplexes = ({
         <button
           onClick={() => {
             setEditingComplex(null);
-            setComplexForm({ name: '', description: '', pricePerHour: '', image: '', location: '', sports: [], featuresText: '' });
+            setComplexForm({ name: '', description: '', pricePerHour: '', image: '', location: '', sports: [], featuresText: '', enabled: true });
             setShowComplexForm(true);
           }}
           className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition"
         >
           Add Complex
         </button>
+      </div>
+
+      {/* Filters */}
+      <div className="mb-4 p-4 bg-gray-50 rounded-lg border">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Sport</label>
+            <select
+              value={sportFilter}
+              onChange={(e) => {
+                setSportFilter(e.target.value);
+                setCurrentPage(prev => ({ ...prev, complexes: 1 }));
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary"
+            >
+              <option value="all">All Sports</option>
+              {sportsForFilter.map(sport => (
+                <option key={sport} value={sport}>{sport}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setCurrentPage(prev => ({ ...prev, complexes: 1 }));
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary"
+            >
+              <option value="all">All Status</option>
+              <option value="enabled">Enabled</option>
+              <option value="disabled">Disabled</option>
+            </select>
+          </div>
+        </div>
       </div>
 
       <div className="overflow-x-auto">
@@ -285,8 +383,13 @@ const AdminComplexes = ({
               </tr>
             ) : (
               paginatedComplexes.map((complex) => (
-                <tr key={complex.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{complex.name}</td>
+                <tr key={complex.id} className={complex.enabled === false ? 'opacity-60 bg-gray-50' : ''}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {complex.name}
+                    {complex.enabled === false && (
+                      <span className="ml-2 px-2 py-0.5 text-xs font-semibold rounded bg-gray-200 text-gray-600">Disabled</span>
+                    )}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{complex.location || 'N/A'}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">£{complex.pricePerHour?.toFixed(2) || '0.00'}</td>
                   <td className="px-6 py-4 text-sm text-gray-500">
@@ -311,6 +414,13 @@ const AdminComplexes = ({
                       >
                         <HiPencil className="w-5 h-5" />
                       </button>
+                      <button 
+                        onClick={() => handleToggleEnabled(complex)} 
+                        className={complex.enabled !== false ? "text-yellow-600 hover:text-yellow-900" : "text-gray-400 hover:text-gray-600"} 
+                        title={complex.enabled !== false ? "Disable" : "Enable"}
+                      >
+                        {complex.enabled !== false ? <HiXCircle className="w-5 h-5" /> : <HiCheckCircle className="w-5 h-5" />}
+                      </button>
                       <button
                         onClick={() => handleDeleteComplex(complex.id)}
                         className="text-red-600 hover:text-red-900"
@@ -326,7 +436,7 @@ const AdminComplexes = ({
           </tbody>
         </table>
       </div>
-      <PaginationControls data={complexes} />
+      <PaginationControls data={filteredComplexes} />
 
       {/* Complex Form Modal */}
       {showComplexForm && (

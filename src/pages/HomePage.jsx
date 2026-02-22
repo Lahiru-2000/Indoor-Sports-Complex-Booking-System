@@ -24,7 +24,10 @@ const HomePage = ({ user }) => {
         const coachesSnapshot = await getDocs(collection(db, 'coaches'));
         const coachesData = await Promise.all(
           coachesSnapshot.docs
-            .filter(docSnap => docSnap.data().status !== 'deleted')
+            .filter(docSnap => {
+              const data = docSnap.data();
+              return data.status !== 'deleted' && data.enabled !== false;
+            })
             .map(async (docSnap) => {
               const coachData = { id: docSnap.id, ...docSnap.data() };
               if (coachData.complexId) {

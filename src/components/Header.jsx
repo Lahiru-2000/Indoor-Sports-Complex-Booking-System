@@ -16,6 +16,8 @@ const Header = ({ user: userProp }) => {
 
   const handleLogout = async () => {
     try {
+      // Clear session data
+      localStorage.removeItem('loginTimestamp');
       await signOut(auth);
       navigate('/');
     } catch (error) {
@@ -136,7 +138,7 @@ const Header = ({ user: userProp }) => {
                 )}
                 <button
                   onClick={handleLogout}
-                  className="px-4 py-2 text-gray-700 hover:text-primary transition"
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-semibold"
                 >
                   Logout
                 </button>
@@ -253,7 +255,7 @@ const Header = ({ user: userProp }) => {
                     handleLogout();
                     setMobileMenuOpen(false);
                   }}
-                  className="block w-full text-left px-4 py-2 text-gray-700 hover:text-primary transition"
+                  className="block w-full text-left px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-semibold"
                 >
                   Logout
                 </button>
